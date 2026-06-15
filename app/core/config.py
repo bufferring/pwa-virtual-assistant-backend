@@ -9,6 +9,15 @@ class Settings(BaseSettings):
     LLAMA_SERVER_URL: str = "http://host.containers.internal:8080"
     LLAMA_TIMEOUT: int = 300
 
+    # Servicio de embeddings
+    EMBEDDING_SERVER_URL: str = "http://host.containers.internal:8081"
+    EMBEDDING_MODEL: str = "nomic-embed"
+
+    # RAG
+    CHROMA_PERSIST_DIR: str = "/app/chroma_data"
+    CHROMA_COLLECTION_NAME: str = "unefa_knowledge"
+    RAG_TOP_K: int = 4
+
     # Seguridad
     API_KEY: str | None = None
 

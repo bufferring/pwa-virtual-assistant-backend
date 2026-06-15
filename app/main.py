@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from app.api.endpoints import router, llm_service
 from app.core.config import get_settings
+from app.services.rag_service import rag_service
 import logging
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,7 +19,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     await llm_service.close()
-
+    await rag_service.close()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -41,4 +43,4 @@ app.include_router(router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
-    return {"message": "LLM API is running"}
+    return {"message": "UNEFA Apure Virtual Assistant API is running"}
