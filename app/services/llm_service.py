@@ -40,18 +40,20 @@ class LLMService:
             "stream": True,
         }
 
-        async with self._client.stream("POST", self.llama_url, json=payload) as response:
+        async with self._client.stream(
+            "POST", self.llama_url, json=payload
+        ) as response:
             if response.status_code != 200:
                 error_msg = await response.aread()
-                raise Exception(f"LLM server error: {error_msg.decode()}")
+                raise Exception(
+                    f"LLM server error {response.status_code}: {error_msg.decode()[:500]}"
+                )
 
             async for chunk in response.aiter_bytes(chunk_size=65536):
                 yield chunk
 
     async def chat_completion(self, request: ChatCompletionRequest) -> dict:
-        """
-        Respuesta completa (sin streaming)
-        """
+        """Respuesta completa (sin streaming)"""
         payload = {
             "model": request.model,
             "messages": [
@@ -63,7 +65,12 @@ class LLMService:
         }
 
         response = await self._client.post(self.llama_url, json=payload)
-        response.raise_for_status()
+
+        # Capturar body del error para diagnóstico
+        if response.status_code != 200:
+            error_body = response.text[:500]
+            raise Exception(f"LLM error {response.status_code}: {error_body}")
+
         return response.json()
 
     async def list_models(self) -> dict:

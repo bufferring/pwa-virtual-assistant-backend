@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
 from app.api.endpoints import router, llm_service
 from app.core.config import get_settings
 from app.services.rag_service import rag_service
@@ -21,11 +20,11 @@ async def lifespan(app: FastAPI):
     await llm_service.close()
     await rag_service.close()
 
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
-    default_response_class=ORJSONResponse,
 )
 
 # CORS middleware

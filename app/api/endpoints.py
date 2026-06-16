@@ -1,6 +1,5 @@
 import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse, ORJSONResponse
 from app.core.schemas import ChatCompletionRequest, Message
 from app.services.llm_service import LLMService
 from app.services.rag_service import rag_service
@@ -12,40 +11,38 @@ router = APIRouter()
 llm_service = LLMService()
 
 # Prompt del sistema por defecto para el asistente UNEFA Apure
-SYSTEM_PROMPT_BASE = """Eres un asistente virtual especializado en la Universidad Nacional Experimental Politécnica de la Fuerza Armada Nacional Bolivariana (UNEFA), con enfoque particular en el Núcleo Apure.
+SYSTEM_PROMPT_BASE = """Eres el asistente virtual de la UNEFA Núcleo Apure (Venezuela).
 
-Tu propósito es ayudar a estudiantes, docentes y personal administrativo respondiendo preguntas sobre:
-- Reglamentos (estudios de pregrado, disciplinario, código de ética)
-- Planes de estudio de las carreras ofrecidas
-- Calendario académico
-- Información del Núcleo Apure (ubicación, contacto, carreras)
-- Historia y símbolos de la UNEFA
-
-INSTRUCCIONES IMPORTANTES:
-1. Responde SIEMPRE en español.
-2. Basa tus respuestas ÚNICAMENTE en el contexto proporcionado.
-3. Si la información no está en el contexto, di honestamente: "No tengo esa información en mi base de conocimiento."
-4. Cuando cites información, menciona la fuente (ej: "Según el Artículo 58 del Reglamento de Pregrado...").
-5. Sé claro, conciso y útil."""
+REGLAS ESTRICTAS:
+- Responde SOLO usando la información del CONTEXTO proporcionado abajo.
+- Si el CONTEXTO no contiene la respuesta, responde exactamente: "No tengo esa información en mi base de conocimiento."
+- Cita la fuente cuando sea posible (ej: "Según nucleo-apure...").
+- Responde en español, de forma clara y concisa.
+- NO inventes información. /no_think"""
 
 
 def construir_prompt_con_contexto(contexto_chunks: list[dict]) -> str:
     """Construye el system prompt inyectando el contexto RAG."""
     if not contexto_chunks:
-        return SYSTEM_PROMPT_BASE
-    
-    contexto_texto = "\n\n---\n\n".join([
-        f"[Fuente: {chunk['metadata'].get('fuente', 'Desconocida')} | "
-        f"Sección: {chunk['metadata'].get('seccion', 'General')}]\n"
-        f"{chunk['documento']}"
-        for chunk in contexto_chunks
-    ])
-    
+        return SYSTEM_PROMPT_BASE + "\n\nCONTEXTO: (vacío)"
+
+    # Ordenar por relevancia (distancia menor primero)
+    chunks_ordenados = sorted(contexto_chunks, key=lambda x: x["distancia"])
+
+    contexto_texto = "\n\n".join(
+        [
+            f"--- DOCUMENTO {i + 1} (fuente: {chunk['metadata'].get('fuente', '?')}) ---\n"
+            f"{chunk['documento']}"
+            for i, chunk in enumerate(chunks_ordenados)
+        ]
+    )
+
     return f"""{SYSTEM_PROMPT_BASE}
 
-=== CONTEXTO DE REFERENCIA ===
+CONTEXTO:
 {contexto_texto}
-=== FIN DEL CONTEXTO ==="""
+
+FIN DEL CONTEXTO. Responde la pregunta del usuario basándote ÚNICAMENTE en lo anterior."""
 
 
 @router.post("/chat/completions")
@@ -63,39 +60,32 @@ async def chat_completions(request: ChatCompletionRequest):
             if msg.role == "user":
                 user_query = msg.content
                 break
-        
+
         # 2. Buscar contexto con RAG
         contexto_chunks = []
         if user_query:
             try:
                 contexto_chunks = await rag_service.search_context(
-                    query=user_query,
-                    top_k=4
+                    query=user_query, top_k=rag_service.settings.RAG_TOP_K
                 )
             except Exception as e:
                 logger.error(f"Error en búsqueda RAG: {e}")
                 # Continuamos sin contexto si falla RAG
-        
+
         # 3. Construir system prompt con contexto
         system_prompt = construir_prompt_con_contexto(contexto_chunks)
-        
+
         # 4. Inyectar/actualizar el mensaje de sistema
         system_exists = False
         for i, msg in enumerate(request.messages):
             if msg.role == "system":
-                request.messages[i] = Message(
-                    role="system", 
-                    content=system_prompt
-                )
+                request.messages[i] = Message(role="system", content=system_prompt)
                 system_exists = True
                 break
-        
+
         if not system_exists:
-            request.messages.insert(
-                0, 
-                Message(role="system", content=system_prompt)
-            )
-        
+            request.messages.insert(0, Message(role="system", content=system_prompt))
+
         # 5. Continuar con el flujo normal al LLM
         if request.stream:
             return StreamingResponse(
@@ -109,7 +99,7 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         else:
             response = await llm_service.chat_completion(request)
-            return ORJSONResponse(content=response)
+            return response
 
     except httpx.TimeoutException:
         logger.error("Timeout connecting to LLM server")
@@ -138,5 +128,5 @@ async def rag_stats():
     """Endpoint para ver el estado de la base RAG."""
     return {
         "total_documentos": rag_service.collection.count(),
-        "coleccion": rag_service.collection.name
+        "coleccion": rag_service.collection.name,
     }
