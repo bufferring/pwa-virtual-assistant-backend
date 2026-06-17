@@ -1,0 +1,33 @@
+services:
+  # ==========================================
+  # PRODCUTION
+  # ==========================================
+  unefa-app:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: unefa-backend:latest
+    container_name: unefa-app
+    network_mode: "host"
+    env_file:
+      - .env
+    volumes:
+      - /opt/chroma_data:/app/chroma_data:Z
+    restart: always
+
+  # ==========================================
+  # DEVELOPMENT
+  # ==========================================
+  unefa-dev:
+    image: unefa-backend:latest
+    container_name: unefa-app-dev
+    network_mode: "host"
+    env_file:
+      - .env
+    volumes:
+      # Overwrite only source code
+      - ./app:/app/app:Z
+
+      - /opt/chroma_data_dev:/app/chroma_data:Z
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--reload-dir", "/app/app"]
+    restart: "no"
