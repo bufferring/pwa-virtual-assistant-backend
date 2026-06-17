@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import router, llm_service
+from app.api.tts import router as tts_router
 from app.core.config import get_settings
 from app.services.rag_service import rag_service
 import logging
@@ -38,7 +39,7 @@ app.add_middleware(
 
 # Incluir rutas
 app.include_router(router, prefix=settings.API_V1_STR)
-
+app.include_router(tts_router)
 
 @app.get("/")
 async def root():

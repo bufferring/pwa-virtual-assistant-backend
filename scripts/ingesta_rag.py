@@ -18,7 +18,7 @@ DOCUMENTOS_DIR = "/opt/data_unefa"
 COLLECTION_NAME = "unefa_knowledge"
 
 MAX_CHUNK_SIZE = 1200  # Tamaño objetivo por chunk (caracteres)
-MAX_EMBED_SIZE = 2500 # Límite seguro para el servidor de embeddings
+MAX_EMBED_SIZE = 2500  # Límite seguro para el servidor de embeddings
 OVERLAP_SIZE = 150  # Solapamiento al subdividir chunks grandes
 MAX_RETRIES = 3  # Reintentos por chunk
 RETRY_DELAY = 2  # Segundos entre reintentos
@@ -119,14 +119,16 @@ def chunk_por_secciones(markdown: str, fuente: str) -> list[dict]:
     # Se limpia primero para medir el tamaño real que irá al embedding
     texto_limpio = limpiar_texto(markdown)
     if len(texto_limpio) <= MAX_CHUNK_SIZE and len(texto_limpio) > MIN_CHUNK_LENGTH:
-        return [{
-            "texto": texto_limpio,
-            "metadata": {
-                "fuente": fuente,
-                "seccion": fuente,
-                "tipo": "documento_completo"
+        return [
+            {
+                "texto": texto_limpio,
+                "metadata": {
+                    "fuente": fuente,
+                    "seccion": fuente,
+                    "tipo": "documento_completo",
+                },
             }
-        }]
+        ]
 
     # Si llega aquí, el documento es grande → aplicar chunking jerárquico
     chunks = []
@@ -317,7 +319,7 @@ async def main():
         for archivo in archivos:
             await ingestar_archivo(archivo, collection, client)
 
-    print(f"\n✅ Ingesta completada!")
+    print("\n✅ Ingesta completada!")
     print(f"📊 Total de chunks en colección: {collection.count()}")
 
 

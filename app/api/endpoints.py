@@ -1,6 +1,7 @@
 import httpx
 from fastapi import APIRouter, HTTPException
 from app.core.schemas import ChatCompletionRequest, Message
+from fastapi.responses import StreamingResponse
 from app.services.llm_service import LLMService
 from app.services.rag_service import rag_service
 import logging
