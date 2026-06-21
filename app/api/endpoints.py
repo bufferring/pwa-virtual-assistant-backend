@@ -17,9 +17,8 @@ SYSTEM_PROMPT_BASE = """Eres el asistente virtual de la UNEFA Núcleo Apure (Ven
 REGLAS ESTRICTAS:
 - Responde SOLO usando la información del CONTEXTO proporcionado abajo.
 - Si el CONTEXTO no contiene la respuesta, responde exactamente: "No tengo esa información en mi base de conocimiento."
-- Cita la fuente cuando sea posible (ej: "Según nucleo-apure...").
 - Responde en español, ajustando tu respuesta a la necesidad vista en la pregunta del usuario. No reserves informacion que sea util e inherente a la pregunta del usuario
-- NO inventes información. /no_think"""
+- NO inventes información."""
 
 
 def construir_prompt_con_contexto(contexto_chunks: list[dict]) -> str:
@@ -69,9 +68,19 @@ async def chat_completions(request: ChatCompletionRequest):
                 contexto_chunks = await rag_service.search_context(
                     query=user_query, top_k=rag_service.settings.RAG_TOP_K
                 )
+
+                # ===== LOGS DE DIAGNÓSTICO RAG =====
+                if contexto_chunks:
+                    logger.info(f"🔍 Query: '{user_query}'")
+                    for i, chunk in enumerate(contexto_chunks):
+                        logger.info(
+                            f"📄 Chunk {i + 1} (dist: {chunk['distancia']:.4f} | fuente: {chunk['metadata'].get('fuente', '?')}): {chunk['documento'][:80]}..."
+                        )
+                else:
+                    logger.warning("⚠️ RAG no encontró NINGÚN chunk para esta query.")
+
             except Exception as e:
                 logger.error(f"Error en búsqueda RAG: {e}")
-                # Continuamos sin contexto si falla RAG
 
         # 3. Construir system prompt con contexto
         system_prompt = construir_prompt_con_contexto(contexto_chunks)
@@ -128,6 +137,6 @@ async def health_check():
 async def rag_stats():
     """Endpoint para ver el estado de la base RAG."""
     return {
-        "total_documentos": rag_service.collection.count(),
-        "coleccion": rag_service.collection.name,
+        "total_documentos": rag_service.chroma_collection.count(),
+        "coleccion": rag_service.chroma_collection.name,
     }

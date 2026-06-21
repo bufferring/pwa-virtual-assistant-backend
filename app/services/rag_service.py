@@ -1,8 +1,11 @@
-import httpx
+import asyncio
 import chromadb
-from chromadb.config import Settings as ChromaSettings
-from typing import Optional
 import logging
+from typing import Optional
+
+from llama_index.core import VectorStoreIndex, Settings
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.embeddings.openai import OpenAIEmbedding
 
 from app.core.config import get_settings
 
@@ -13,81 +16,68 @@ class RAGService:
     def __init__(self):
         self.settings = get_settings()
 
-        # Cliente HTTP para embeddings
-        self._http_client = httpx.AsyncClient(timeout=30.0)
-
-        # Cliente ChromaDB persistente
-        self.chroma_client = chromadb.PersistentClient(
-            path=self.settings.CHROMA_PERSIST_DIR,
-            settings=ChromaSettings(anonymized_telemetry=False),
+        # 1. Configurar el modelo de Embeddings en LlamaIndex
+        Settings.embed_model = OpenAIEmbedding(
+            model_name=self.settings.EMBEDDING_MODEL,
+            api_base=self.settings.EMBEDDING_SERVER_URL,
+            api_key="fake-key",
+            embed_batch_size=10,
         )
 
-        # Obtener o crear la colección
-        self.collection = self.chroma_client.get_or_create_collection(
+        # 2. Conectar con ChromaDB persistente
+        self.chroma_client = chromadb.PersistentClient(
+            path=self.settings.CHROMA_PERSIST_DIR
+        )
+        self.chroma_collection = self.chroma_client.get_or_create_collection(
             name=self.settings.CHROMA_COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
         )
 
+        # 3. Envolver ChromaDB en el VectorStore de LlamaIndex
+        self.vector_store = ChromaVectorStore(chroma_collection=self.chroma_collection)
+
+        # 4. Cargar el índice desde el vector store existente
+        self.index = VectorStoreIndex.from_vector_store(self.vector_store)
+
         logger.info(
-            f"RAG Service inicializado. Documentos en colección: {self.collection.count()}"
+            f"RAG Service (LlamaIndex) inicializado. Documentos: {self.chroma_collection.count()}"
         )
 
     async def close(self):
-        await self._http_client.aclose()
-
-    async def get_embedding(self, text: str) -> list[float]:
-        """Obtiene el vector de embedding de un texto usando nomic-embed."""
-        payload = {"input": text, "model": self.settings.EMBEDDING_MODEL}
-
-        response = await self._http_client.post(
-            f"{self.settings.EMBEDDING_SERVER_URL}/v1/embeddings", json=payload
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
+        pass
 
     async def search_context(
-        self, query: str, top_k: Optional[int] = None, where: Optional[dict] = None
+        self, query: str, top_k: Optional[int] = None
     ) -> list[dict]:
         """
-        Busca los chunks más relevantes para una consulta.
-        Retorna lista de dicts con 'documento', 'metadata' y 'distancia'.
+        Busca los chunks más relevantes usando LlamaIndex Retriever.
         """
-        if self.collection.count() == 0:
+        if self.chroma_collection.count() == 0:
             logger.warning("La colección RAG está vacía")
             return []
 
         k = top_k or self.settings.RAG_TOP_K
-        query_embedding = await self.get_embedding(query)
 
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=k,
-            where=where,
-            include=["documents", "metadatas", "distances"],
-        )
+        retriever = self.index.as_retriever(similarity_top_k=k)
+
+        nodes = await asyncio.to_thread(retriever.retrieve, query)
 
         context_chunks = []
-        if results and results["documents"] and results["documents"][0]:
-            for doc, meta, dist in zip(
-                results["documents"][0],
-                results["metadatas"][0],
-                results["distances"][0],
-            ):
-                context_chunks.append(
-                    {"documento": doc, "metadata": meta, "distancia": dist}
-                )
+        for node_with_score in nodes:
+            node = node_with_score.node
 
-        logger.info(
-            f"Búsqueda RAG: {len(context_chunks)} chunks encontrados para query"
-        )
+            # Conversión de Score (1.0 es perfecto) a Distancia (0.0 es perfecto)
+            distancia = 1.0 - node_with_score.score if node_with_score.score else 0.0
+
+            context_chunks.append(
+                {
+                    "documento": node.get_content(),
+                    "metadata": node.metadata,
+                    "distancia": distancia,
+                }
+            )
+
+        logger.info(f"Búsqueda RAG: {len(context_chunks)} chunks encontrados.")
         return context_chunks
-
-    async def add_document(self, doc_id: str, text: str, metadata: dict):
-        """Añade un documento a la colección (usado por el script de ingesta)."""
-        embedding = await self.get_embedding(text)
-        self.collection.upsert(
-            ids=[doc_id], embeddings=[embedding], documents=[text], metadatas=[metadata]
-        )
 
 
 # Instancia singleton

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     LLAMA_SERVER_URL: str = "http://host.containers.internal:8080"
     LLAMA_TIMEOUT: int = 300
+    LLM_API_KEY: str | None = None
 
     # Servicio de embeddings
     EMBEDDING_SERVER_URL: str = "http://host.containers.internal:8081"

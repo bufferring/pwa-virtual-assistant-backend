@@ -4,13 +4,14 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
+
 @router.get("/tts")
 async def tts(text: str):
     """
     Convierte texto a voz usando Edge TTS.
     Retorna audio MP3 en streaming.
     """
-    communicate = edge_tts.Communicate(text, "es-ES-AlvaroNeural")
+    communicate = edge_tts.Communicate(text, "es-MX-DaliaNeural")
 
     async def audio_stream():
         async for chunk in communicate.stream():

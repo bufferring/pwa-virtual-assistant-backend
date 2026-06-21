@@ -11,9 +11,15 @@ class LLMService:
         self.models_url = f"{self.settings.LLAMA_SERVER_URL}/v1/models"
         self.health_url = f"{self.settings.LLAMA_SERVER_URL}/health"
         self.timeout = self.settings.LLAMA_TIMEOUT
+
+        headers = {}
+        if self.settings.LLM_API_KEY:
+            headers["Authorization"] = f"Bearer {self.settings.LLM_API_KEY}"
+
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout, connect=10.0),
             http2=True,
+            headers=headers,
             limits=httpx.Limits(
                 max_connections=100,
                 max_keepalive_connections=20,
