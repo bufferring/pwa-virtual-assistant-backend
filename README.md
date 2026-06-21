@@ -45,10 +45,10 @@ Sin embargo, **el backend no está acoplado a llama.cpp**: solo necesita un endp
 
 4. Se construye un "Súper Prompt" inyectando el contexto relevante:
    ┌─────────────────────────────────────────────────────────────┐
-   │ System: Eres un asistente de la UNEFA Apure.               │
-   │         Responde basándote en este contexto:               │
-   │         [Fragmento del calendario académico 2026]          │
-   │ User: ¿Cuándo son las inscripciones?                       │
+   │ System: Eres un asistente de la UNEFA Apure.                │
+   │         Responde basándote en este contexto:                │
+   │         [Fragmento del calendario académico 2026]           │
+   │ User: ¿Cuándo son las inscripciones?                        │
    └─────────────────────────────────────────────────────────────┘
 
 5. El prompt se envía al LLM generador (local o en la nube) y este
@@ -72,22 +72,22 @@ Sin embargo, **el backend no está acoplado a llama.cpp**: solo necesita un endp
 │                        TU SERVIDOR                               │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐        ┌─────────────────────┐                │
-│  │    CADDY     │───────▶│ FastAPI (Podman)    │                │
-│  │  :80 / :443  │ :8000  │ --network=host      │                │
-│  │  (systemd)   │        │ usuario: appuser    │                │
-│  └──────────────┘        │ + ChromaDB          │                │
-│                          └──────┬──────┬───────┘                │
+│  ┌──────────────┐        ┌─────────────────────┐                 │
+│  │    CADDY     │───────▶│ FastAPI (Podman)    │                 │
+│  │  :80 / :443  │ :8000  │ --network=host      │                 │
+│  │  (systemd)   │        │ usuario: appuser    │                 │
+│  └──────────────┘        │ + ChromaDB          │                 │
+│                          └──────┬──────┬───────┘                 │
 │                                 │      │                         │
 │                      HTTP :8080 │      │ HTTP :8081              │
 │                                 ▼      ▼                         │
-│  ┌──────────────────────┐  ┌──────────────────────┐            │
-│  │ llama-server          │  │ llama-server         │            │
-│  │ (systemd)             │  │ (systemd)            │            │
-│  │ Puerto 8080            │  │ Puerto 8081          │            │
-│  │ LLM principal          │  │ nomic-embed-text     │            │
-│  │ (genera respuestas)    │  │ (genera embeddings)  │            │
-│  └──────────────────────┘  └──────────────────────┘            │
+│  ┌──────────────────────┐  ┌──────────────────────┐              │
+│  │ llama-server         │  │ llama-server         │              │
+│  │ (systemd)            │  │ (systemd)            │              │
+│  │ Puerto 8080          │  │ Puerto 8081          │              │
+│  │ LLM principal        │  │ nomic-embed-text     │              │
+│  │ (genera respuestas)  │  │ (genera embeddings)  │              │
+│  └──────────────────────┘  └──────────────────────┘              │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -101,23 +101,23 @@ Cuando el servidor no tiene recursos para correr el LLM principal (CPU/RAM/GPU i
 │                        TU SERVIDOR (pequeño)                     │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐        ┌─────────────────────┐                │
-│  │    CADDY     │───────▶│ FastAPI (Podman)    │                │
-│  │  :80 / :443  │ :8000  │ --network=host      │                │
-│  │  (systemd)   │        │ usuario: appuser    │                │
-│  └──────────────┘        │ + ChromaDB          │                │
-│                          └──────┬──────┬───────┘                │
+│  ┌──────────────┐        ┌─────────────────────┐                 │
+│  │    CADDY     │───────▶│ FastAPI (Podman)    │                 │
+│  │  :80 / :443  │ :8000  │ --network=host      │                 │
+│  │  (systemd)   │        │ usuario: appuser    │                 │
+│  └──────────────┘        │ + ChromaDB          │                 │
+│                          └──────┬──────┬───────┘                 │
 │                                 │      │                         │
 │                      HTTPS      │      │ HTTP :8081 (local)      │
 │                                 ▼      ▼                         │
-│              ┌──────────────────┐  ┌──────────────────────┐    │
-│              │  API en la nube  │  │ llama-server         │    │
-│              │  (OpenRouter,    │  │ (systemd)             │    │
-│              │  Groq, etc.)     │  │ Puerto 8081           │    │
-│              │  LLM principal   │  │ nomic-embed-text      │    │
-│              │  (genera         │  │ (genera embeddings,   │    │
-│              │   respuestas)    │  │  se queda local)       │    │
-│              └──────────────────┘  └──────────────────────┘    │
+│              ┌──────────────────┐  ┌──────────────────────┐      │
+│              │  API en la nube  │  │ llama-server         │      │
+│              │  (OpenRouter,    │  │ (systemd)            │      │
+│              │  Groq, etc.)     │  │ Puerto 8081          │      │
+│              │  LLM principal   │  │ nomic-embed-text     │      │
+│              │  (genera         │  │ (genera embeddings,  │      │
+│              │   respuestas)    │  │  se queda local)     │      │
+│              └──────────────────┘  └──────────────────────┘      │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
